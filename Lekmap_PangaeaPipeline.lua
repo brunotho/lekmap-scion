@@ -5594,3 +5594,212 @@ function StartPlotSystem()
 	end
 	if LekPipelineFlow then LekPipelineFlow("StartPlotSystem_done"); end
 end
+
+------------------------------------------------------------------------------
+-- Lekmap (user, 2026-10-27): rivers that end on dry land find their way to water.
+-- Rivers are made before start placement; afterwards some water becomes land (inland seas near capitals,
+-- the coastal-capital clearing, coastal bonus islands), and a river that flowed into it ends on land, which
+-- the game draws as a puddle. This pass finds every river edge whose downstream corner touches no water and
+-- has no river flowing on, and walks on from there edge by edge toward the nearest water (until it reaches
+-- water, the map edge or a river that flows on). If it can't get out, the tile at its end becomes a lake.
+--
+-- Corners are identified by their three plots. River flags (Civ V): W = river on the plot's east edge
+-- (corners NE and SE, flow N/S), NW = on its southeast edge (corners SE and S, flow NE/SW), NE = on its
+-- southwest edge (corners S and SW, flow SE/NW).
+------------------------------------------------------------------------------
+LEK_RIVER_REPAIR_MAX_STEPS = 40;
+
+function LekRepairDeadEndRivers()
+	local iW, iH = Map.GetGridSize();
+	local D = DirectionTypes;
+	local F = FlowDirectionTypes;
+	local function nb(p, dir)
+		if p == nil then return nil; end
+		return Map.PlotDirection(p:GetX(), p:GetY(), dir);
+	end
+	local function idx(p) return p and (p:GetY() * iW + p:GetX()) or -1; end
+	local function corner(a, b, c)
+		local t = { idx(a), idx(b), idx(c) };
+		table.sort(t);
+		return { key = t[1] .. ":" .. t[2] .. ":" .. t[3], plots = { a, b, c } };
+	end
+	local function cNE(p) return corner(p, nb(p, D.DIRECTION_NORTHEAST), nb(p, D.DIRECTION_EAST)); end
+	local function cSE(p) return corner(p, nb(p, D.DIRECTION_EAST), nb(p, D.DIRECTION_SOUTHEAST)); end
+	local function cS(p) return corner(p, nb(p, D.DIRECTION_SOUTHEAST), nb(p, D.DIRECTION_SOUTHWEST)); end
+	local function cSW(p) return corner(p, nb(p, D.DIRECTION_SOUTHWEST), nb(p, D.DIRECTION_WEST)); end
+	-- An edge: holder plot + flag ("W", "NW", "NE"), its two corners and the flow that leads to each.
+	local function edge(h, flag)
+		if flag == "W" then
+			return { h = h, flag = flag, a = cNE(h), fa = F.FLOWDIRECTION_NORTH, b = cSE(h), fb = F.FLOWDIRECTION_SOUTH };
+		elseif flag == "NW" then
+			return { h = h, flag = flag, a = cSE(h), fa = F.FLOWDIRECTION_NORTHEAST, b = cS(h), fb = F.FLOWDIRECTION_SOUTHWEST };
+		else
+			return { h = h, flag = flag, a = cSW(h), fa = F.FLOWDIRECTION_NORTHWEST, b = cS(h), fb = F.FLOWDIRECTION_SOUTHEAST };
+		end
+	end
+	local function hasRiver(e)
+		if e.flag == "W" then return e.h:IsWOfRiver(); elseif e.flag == "NW" then return e.h:IsNWOfRiver(); end
+		return e.h:IsNEOfRiver();
+	end
+	local function flowOf(e)
+		if e.flag == "W" then return e.h:GetRiverEFlowDirection(); elseif e.flag == "NW" then return e.h:GetRiverSEFlowDirection(); end
+		return e.h:GetRiverSWFlowDirection();
+	end
+	local function setRiver(e, flow)
+		if e.flag == "W" then e.h:SetWOfRiver(true, flow); elseif e.flag == "NW" then e.h:SetNWOfRiver(true, flow);
+		else e.h:SetNEOfRiver(true, flow); end
+	end
+	local function downstream(e)
+		local fl = flowOf(e);
+		if fl == e.fa then return e.a; elseif fl == e.fb then return e.b; end
+		return nil;
+	end
+	-- The edge between two neighbouring plots (nil if they aren't neighbours).
+	local function edgeBetween(p, q)
+		if p == nil or q == nil then return nil; end
+		local x, y = q:GetX(), q:GetY();
+		local function is(dir) local r = nb(p, dir); return r ~= nil and r:GetX() == x and r:GetY() == y; end
+		if is(D.DIRECTION_EAST) then return edge(p, "W"); elseif is(D.DIRECTION_WEST) then return edge(q, "W");
+		elseif is(D.DIRECTION_SOUTHEAST) then return edge(p, "NW"); elseif is(D.DIRECTION_NORTHWEST) then return edge(q, "NW");
+		elseif is(D.DIRECTION_SOUTHWEST) then return edge(p, "NE"); elseif is(D.DIRECTION_NORTHEAST) then return edge(q, "NE"); end
+		return nil;
+	end
+	local function cornerEdges(c)
+		local p = c.plots;
+		return { edgeBetween(p[1], p[2]), edgeBetween(p[2], p[3]), edgeBetween(p[1], p[3]) };
+	end
+	local function touchesWaterOrEdge(c)
+		for i = 1, 3 do
+			local p = c.plots[i];
+			if p == nil or p:IsWater() then return true; end
+		end
+		return false;
+	end
+	local function sameEdge(e1, e2) return e1 ~= nil and e2 ~= nil and e1.flag == e2.flag and idx(e1.h) == idx(e2.h); end
+	-- A river flows on from corner c along another edge than e.
+	local function flowsOn(c, e)
+		for _, o in ipairs(cornerEdges(c)) do
+			if o ~= nil and not sameEdge(o, e) and hasRiver(o) then
+				local d = downstream(o);
+				if d ~= nil and d.key ~= c.key then return true; end
+			end
+		end
+		return false;
+	end
+	-- Distance of every plot to the nearest water (BFS over the map).
+	local dist, q = {}, {};
+	for k = 0, Map.GetNumPlots() - 1 do
+		if Map.GetPlotByIndex(k):IsWater() then dist[k] = 0; q[#q + 1] = k; end
+	end
+	local h = 1;
+	while h <= #q do
+		local k = q[h]; h = h + 1;
+		local p = Map.GetPlotByIndex(k);
+		for dir = 0, 5 do
+			local n = nb(p, dir);
+			if n ~= nil then
+				local nk = idx(n);
+				if dist[nk] == nil then dist[nk] = dist[k] + 1; q[#q + 1] = nk; end
+			end
+		end
+	end
+	local function cornerDist(c)
+		local best = 999;
+		for i = 1, 3 do
+			local p = c.plots[i];
+			if p ~= nil and (dist[idx(p)] or 999) < best then best = dist[idx(p)] or 999; end
+		end
+		return best;
+	end
+	-- Collect the dead ends first, then repair them.
+	local dead = {};
+	for k = 0, Map.GetNumPlots() - 1 do
+		local p = Map.GetPlotByIndex(k);
+		for _, flag in ipairs({ "W", "NW", "NE" }) do
+			local e = edge(p, flag);
+			if hasRiver(e) then
+				local c = downstream(e);
+				if c ~= nil and not touchesWaterOrEdge(c) and not flowsOn(c, e) then
+					dead[#dead + 1] = { e = e, c = c };
+				end
+			end
+		end
+	end
+	local nExtended, nSteps, nLakes, nFailed = 0, 0, 0, 0;
+	local startPlots = {};
+	for pid = 0, GameDefines.MAX_CIV_PLAYERS - 1 do
+		local pl = Players[pid];
+		if pl and pl:IsEverAlive() then
+			local sp = pl:GetStartingPlot();
+			if sp then startPlots[idx(sp)] = true; end
+		end
+	end
+	for _, d in ipairs(dead) do
+		local e, c = d.e, d.c;
+		if not touchesWaterOrEdge(c) and not flowsOn(c, e) then	-- an earlier repair may have fixed it
+			local visited = { [c.key] = true };
+			local added = {};
+			local ok = false;
+			for _ = 1, LEK_RIVER_REPAIR_MAX_STEPS do
+				local best, bestD, bestFlow, bestNext = nil, 999, nil, nil;
+				for _, o in ipairs(cornerEdges(c)) do
+					if o ~= nil and not sameEdge(o, e) then
+						local nextC, fl;
+						if o.a.key == c.key then nextC, fl = o.b, o.fb; else nextC, fl = o.a, o.fa; end
+						if not visited[nextC.key] then
+							if hasRiver(o) then
+								-- joining a river that already flows away from here
+								if downstream(o) ~= nil and downstream(o).key == nextC.key then
+									best, bestD, bestNext = o, -1, nextC;
+								end
+							else
+								local dd = cornerDist(nextC) * 10 + Map.Rand(10, "Lek river repair");
+								if dd < bestD then best, bestD, bestFlow, bestNext = o, dd, fl, nextC; end
+							end
+						end
+					end
+				end
+				if best == nil then break; end
+				if bestD == -1 then ok = true; break; end	-- merged
+				setRiver(best, bestFlow);
+				added[#added + 1] = best;
+				nSteps = nSteps + 1;
+				visited[bestNext.key] = true;
+				e, c = best, bestNext;
+				if touchesWaterOrEdge(c) or flowsOn(c, e) then ok = true; break; end
+			end
+			if ok then
+				nExtended = nExtended + 1;
+			else
+				-- no way out: take the walk back and put a one-tile lake at the original end, on the plot the
+				-- river doesn't run along (resource-free, not a start, not a natural wonder)
+				for _, a in ipairs(added) do
+					if a.flag == "W" then a.h:SetWOfRiver(false, F.NO_FLOWDIRECTION);
+					elseif a.flag == "NW" then a.h:SetNWOfRiver(false, F.NO_FLOWDIRECTION);
+					else a.h:SetNEOfRiver(false, F.NO_FLOWDIRECTION); end
+				end
+				nSteps = nSteps - #added;
+				local made = false;
+				for i = 1, 3 do
+					local p = d.c.plots[i];
+					if p ~= nil and not made and not startPlots[idx(p)] and p:GetResourceType(-1) == -1
+						and not LekPlotIsNaturalWonder(p) and not p:IsMountain() then
+						-- the plot opposite the incoming edge: not one of the two plots the edge separates
+						local ee = edgeBetween(d.c.plots[(i % 3) + 1], d.c.plots[((i + 1) % 3) + 1]);
+						if ee ~= nil and sameEdge(ee, d.e) then
+							p:SetFeatureType(FeatureTypes.NO_FEATURE, -1);
+							p:SetPlotType(PlotTypes.PLOT_OCEAN, false, false);
+							p:SetTerrainType(TerrainTypes.TERRAIN_COAST, false, false);
+							made = true;
+						end
+					end
+				end
+				if made then nLakes = nLakes + 1; else nFailed = nFailed + 1; end
+			end
+		end
+	end
+	if nLakes > 0 then
+		Map.RecalculateAreas();
+	end
+	print("### LekRivers deadEnds=" .. #dead .. " extended=" .. nExtended .. " steps=" .. nSteps .. " lakes=" .. nLakes .. " unfixed=" .. nFailed);
+end

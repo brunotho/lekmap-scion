@@ -954,6 +954,12 @@ function LekHB_GenerateMap_Core()
 			LekFillInlandSeasNearCapitals();
 			stage("after_LekFillInlandSeasNearCapitals");
 		end
+		-- Lekmap: rivers that now end on land (water filled in after rivers were made) find their way to water.
+		if LekRepairDeadEndRivers then
+			local okRiv, errRiv = pcall(LekRepairDeadEndRivers);
+			if not okRiv then print("### LekRivers repair failed: " .. tostring(errRiv)); end
+			stage("after_LekRepairDeadEndRivers");
+		end
 		if LekLogFinalLandStats then
 			LekLogFinalLandStats();
 		end

@@ -8,6 +8,7 @@
 
 ## Graphics
 - All land on a map uses the same continent art (textures); before, islands of 10 or more tiles got a different random set than the mainland next to them.
+- Fixed: rivers no longer end in a broken "puddle" on dry land. Where water near a capital was turned into land after the rivers were made, the river now continues to the nearest water (or ends in a small lake).
 
 # Lekmap Scion 1.0.0 (compared with Lekmap 5.2)
 
