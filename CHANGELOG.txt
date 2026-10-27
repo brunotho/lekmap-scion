@@ -4,6 +4,7 @@
 - Fixed: bonus resources (Wheat, Cattle, Deer, Fish and the others) are placed again; Lekmap Scion 1.0.0 placed almost none.
 - Now and then a Sugar sits on a marsh, Spices on a forested or jungle hill, or Deer on open flat tundra (this was meant to be in 1.0.0 but never worked).
 - Amber under jungle always sits on plains (a jungle on grassland could appear before).
+- Salt mostly sits in small groups of 2-4, 4 to 6 tiles inland from the ocean (lakes and inland seas don't count). It can still appear alone as a City-State's luxury or near a capital; there is about as much Salt on the map as before.
 
 # Lekmap Scion 1.0.0 (compared with Lekmap 5.2)
 

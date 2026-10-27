@@ -20573,6 +20573,137 @@ function LekClearFeaturesOnSheep()
 	if LekPipelineFlow then LekPipelineFlow("sheep_feature_cleared", "n=" .. tostring(n)); end
 end
 ------------------------------------------------------------------------------
+-- Lekmap (user, 2026-10-27): Salt in a band inland from the main ocean, in small clusters.
+-- Salt is no longer a random filler luxury; this pass tops the map's Salt up to LEK_SALT_TARGET (single copies
+-- placed earlier as a City-State or capital luxury count). Distance = hex distance to the largest water body
+-- (inland seas and lakes don't count). Clusters of 2-4 within LEK_SALT_CLUSTER_RADIUS of their first tile.
+LEK_SALT_BAND = { 4, 6 };						-- tiles from the main ocean
+LEK_SALT_BAND_FALLBACK = { 3, 7 };				-- used when the band has no room left
+LEK_SALT_TARGET = { 3, 5 };						-- Salt on the whole map (today's maps had 2-7, about 4)
+LEK_SALT_CLUSTER_SIZE = { 2, 4 };
+LEK_SALT_CLUSTER_RADIUS = 3;					-- members within 3 of the first tile: a cluster spans up to ~7 tiles
+LEK_SALT_MIN_CLUSTER_DIST = 8;
+LEK_SALT_MIN_CAPITAL_DIST = 4;
+LEK_SALT_MIN_CITY_STATE_DIST = 2;
+
+function AssignStartingPlots.LekPlaceSaltBand(self)
+	local res = self.salt_ID;
+	if res == nil or res < 0 then return {}; end
+	local iW, iH = Map.GetGridSize();
+	local wrapX = Map:IsWrapX();
+	-- the main ocean = the water area with the most tiles
+	local areaSize, bestArea, bestSize = {}, -1, 0;
+	for k = 0, Map.GetNumPlots() - 1 do
+		local p = Map.GetPlotByIndex(k);
+		if p:IsWater() and not p:IsLake() then
+			local a = p:GetArea();
+			areaSize[a] = (areaSize[a] or 0) + 1;
+			if areaSize[a] > bestSize then bestArea, bestSize = a, areaSize[a]; end
+		end
+	end
+	local dist, q = {}, {};
+	for k = 0, Map.GetNumPlots() - 1 do
+		local p = Map.GetPlotByIndex(k);
+		if p:IsWater() and p:GetArea() == bestArea then
+			dist[k] = 0;
+			q[#q + 1] = k;
+		end
+	end
+	local maxD = LEK_SALT_BAND_FALLBACK[2];
+	local h = 1;
+	while h <= #q do
+		local k = q[h];
+		h = h + 1;
+		if dist[k] < maxD then
+			for d = 1, 6 do
+				local nx, ny = GetHexNeighbor(k % iW, math.floor(k / iW), d, iW, iH, wrapX, false);
+				if nx >= 0 and nx < iW and ny >= 0 and ny < iH then
+					local nk = ny * iW + nx;
+					if dist[nk] == nil then
+						dist[nk] = dist[k] + 1;
+						q[#q + 1] = nk;
+					end
+				end
+			end
+		end
+	end
+	local function farFromCityStates(x, y)
+		for _, cs in ipairs(self.cityStatePlots or {}) do
+			if type(cs[1]) == "number" and Map.PlotDistance(x, y, cs[1], cs[2]) < LEK_SALT_MIN_CITY_STATE_DIST then return false; end
+		end
+		return true;
+	end
+	local function okTile(x, y, band, needFreeLayer)
+		local k = y * iW + x;
+		local d = dist[k];
+		if d == nil or d < band[1] or d > band[2] then return false; end
+		local p = Map.GetPlot(x, y);
+		if p:GetPlotType() ~= PlotTypes.PLOT_LAND or p:GetFeatureType() ~= FeatureTypes.NO_FEATURE then return false; end
+		local tt = p:GetTerrainType();
+		if tt ~= TerrainTypes.TERRAIN_PLAINS and tt ~= TerrainTypes.TERRAIN_TUNDRA then return false; end	-- no luxuries on flat desert
+		if p:GetResourceType(-1) ~= -1 or p:IsCity() or LekPlotIsNaturalWonder(p) or not p:CanHaveResource(res, false) then return false; end
+		if needFreeLayer and self.luxuryData[k + 1] ~= 0 then return false; end
+		if self:LekStratMinDistanceToAnyMajorStart(x, y) < LEK_SALT_MIN_CAPITAL_DIST then return false; end
+		return farFromCityStates(x, y);
+	end
+	local existing = 0;
+	for k = 0, Map.GetNumPlots() - 1 do
+		if Map.GetPlotByIndex(k):GetResourceType(-1) == res then existing = existing + 1; end
+	end
+	local target = LEK_SALT_TARGET[1] + Map.Rand(LEK_SALT_TARGET[2] - LEK_SALT_TARGET[1] + 1, "Lek salt target");
+	local need = target - existing;
+	local anchors, placed, parts = {}, {}, {};
+	for _, band in ipairs({ LEK_SALT_BAND, LEK_SALT_BAND_FALLBACK }) do
+		if need < LEK_SALT_CLUSTER_SIZE[1] then break; end
+		local cand = {};
+		for k in pairs(dist) do
+			if okTile(k % iW, math.floor(k / iW), band, true) then cand[#cand + 1] = k; end
+		end
+		table.sort(cand);
+		cand = GetShuffledCopyOfTable(cand);
+		for _, k in ipairs(cand) do
+			if need < LEK_SALT_CLUSTER_SIZE[1] then break; end
+			local x, y = k % iW, math.floor(k / iW);
+			local far = true;
+			for _, a in ipairs(anchors) do
+				if Map.PlotDistance(x, y, a[1], a[2]) < LEK_SALT_MIN_CLUSTER_DIST then far = false; break; end
+			end
+			if far and okTile(x, y, band, true) then
+				local size = LEK_SALT_CLUSTER_SIZE[1] + Map.Rand(LEK_SALT_CLUSTER_SIZE[2] - LEK_SALT_CLUSTER_SIZE[1] + 1, "Lek salt cluster size");
+				size = math.min(size, need);
+				local members = { { x, y } };
+				local near = {};
+				for r = 1, LEK_SALT_CLUSTER_RADIUS do
+					for _, t in ipairs(GetHexRingAtRadius(x, y, r, iW, iH, wrapX, false)) do
+						if okTile(t[1], t[2], band, false) then near[#near + 1] = t; end
+					end
+				end
+				near = GetShuffledCopyOfTable(near);
+				for _, t in ipairs(near) do
+					if #members >= size then break; end
+					members[#members + 1] = t;
+				end
+				if #members >= LEK_SALT_CLUSTER_SIZE[1] then
+					for _, m in ipairs(members) do
+						Map.GetPlot(m[1], m[2]):SetResourceType(res, 1);
+						self.amounts_of_resources_placed[res + 1] = self.amounts_of_resources_placed[res + 1] + 1;
+						self.totalLuxPlacedSoFar = self.totalLuxPlacedSoFar + 1;
+						placed[#placed + 1] = m;
+					end
+					for _, m in ipairs(members) do
+						self:PlaceResourceImpact(m[1], m[2], 2, 2);
+					end
+					need = need - #members;
+					anchors[#anchors + 1] = { x, y };
+					parts[#parts + 1] = x .. "," .. y .. "x" .. #members .. "(band" .. band[1] .. "-" .. band[2] .. ")";
+				end
+			end
+		end
+	end
+	LekLandStatsLog("### LekSalt existing=" .. existing .. " target=" .. target .. " clusters=" .. #anchors .. " tiles=" .. #placed .. " " .. table.concat(parts, " "));
+	return placed;
+end
+------------------------------------------------------------------------------
 -- Lekmap: random luxury types without amber (amber only comes from LekPlaceAmberClusters).
 function AssignStartingPlots.LekRandomLuxNoAmber(self)
 	local out = {};
@@ -21271,7 +21402,7 @@ function AssignStartingPlots:PlaceLuxuries()
 		for k = 0, Map.GetNumPlots() - 1 do
 			local p = Map.GetPlotByIndex(k);
 			local rt = p:GetResourceType(-1);
-			if rt ~= -1 and self:LekResourceIsLuxury(rt) then
+			if rt ~= -1 and rt ~= self.salt_ID and self:LekResourceIsLuxury(rt) then	-- the diversity check ignores Salt (user, 2026-10-27)
 				luxPos[#luxPos + 1] = { p:GetX(), p:GetY(), rt };
 			end
 		end
@@ -21370,6 +21501,11 @@ function AssignStartingPlots:PlaceLuxuries()
 			want[self.amber_ID] = 0;
 			local nAmber = AssignStartingPlots.LekPlaceAmberClusters(self);
 			for _, pa in ipairs(nAmber) do luxPos[#luxPos + 1] = { pa[1], pa[2], self.amber_ID }; end
+		end
+		-- Salt is no random filler; the band pass places it in clusters (not added to luxPos: the diversity check ignores it)
+		if self.salt_ID then
+			if want[self.salt_ID] then want[self.salt_ID] = 0; end
+			AssignStartingPlots.LekPlaceSaltBand(self);
 		end
 		for loop, res_ID in ipairs(self.resourceIDs_assigned_to_random) do
 			local primary, secondary, tertiary, quaternary, quinary, senary, luxury_plot_lists, current_list, iNumLeftToPlace;	-- MOD.Barathor: New -- added a quinary and senary list
