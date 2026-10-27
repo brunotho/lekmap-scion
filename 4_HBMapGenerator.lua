@@ -763,6 +763,19 @@ function DetermineContinents()
 	-- Default for this function operates in C++, but you can override by
 	-- replacing this method with your own and not calling the default stamper.
 	Map.DefaultContinentStamper();
+
+	-- Lekmap (user, 2026-10-27): one art set for all land. The default stamper gives every landmass of 10+ tiles
+	-- its own random set, so Scion's bigger islands next to the pangaea looked out of place.
+	local artSet = 1 + Map.Rand(4, "Lekmap continent art set");
+	for i = 0, Map.GetNumPlots() - 1 do
+		local plot = Map.GetPlotByIndex(i);
+		if plot:IsWater() then
+			plot:SetContinentArtType(0);
+		else
+			plot:SetContinentArtType(artSet);
+		end
+	end
+	print("Lekmap: continent art set " .. artSet .. " for all land");
 end
 
 function StartPlotSystem()
