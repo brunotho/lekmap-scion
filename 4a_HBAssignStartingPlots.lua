@@ -24571,7 +24571,8 @@ function AssignStartingPlots:FixResourceGraphics()
 				end		
 			end
 			end -- not an open tundra Deer
-			if res_ID == self.deer_ID or res_ID == self.fur_ID then
+			-- open tundra Deer skip the forest-neighbour rule, so wide open tundra with Deer can exist (user, 2026-10-27)
+			if (res_ID == self.deer_ID and not lekOpenDeer) or res_ID == self.fur_ID then
 				AssignStartingPlots.LekFurDeerEnsureForestAdjacency(plot, x, y);
 			end
 
