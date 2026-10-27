@@ -25621,6 +25621,15 @@ function AssignStartingPlots:PlaceResourcesAndCityStates()
 			LekMapgenDiagLogAppend(msg);
 		end
 	end
+	-- Lekmod Scion: tell the mod which luxuries belong to the players' regions (Lübeck's cartel acts on them)
+	if Game ~= nil and Game.LekmodSetRegionalLuxury ~= nil then
+		local names = {};
+		for _, res_ID in ipairs(self.resourceIDs_assigned_to_regions or {}) do
+			Game.LekmodSetRegionalLuxury(res_ID);
+			table.insert(names, tostring(GameInfo.Resources[res_ID] and GameInfo.Resources[res_ID].Type or res_ID));
+		end
+		print("### LekRegionalLux: " .. table.concat(names, " "));
+	end
 	do
 		local ok, err = pcall(function() self:PlaceCityStates() end);
 		if not ok then
