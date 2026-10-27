@@ -20579,10 +20579,12 @@ end
 -- (inland seas and lakes don't count). Clusters of 2-4 within LEK_SALT_CLUSTER_RADIUS of their first tile.
 LEK_SALT_BAND = { 4, 6 };						-- tiles from the main ocean
 LEK_SALT_BAND_FALLBACK = { 3, 7 };				-- used when the band has no room left
-LEK_SALT_TARGET = { 3, 5 };						-- Salt on the whole map (today's maps had 2-7, about 4)
+LEK_SALT_TARGET = { 4, 6 };						-- Salt on the whole map (before: 2-7, about 4); at least one cluster is always placed
 LEK_SALT_CLUSTER_SIZE = { 2, 4 };
-LEK_SALT_CLUSTER_RADIUS = 3;					-- members within 3 of the first tile: a cluster spans up to ~7 tiles
-LEK_SALT_MIN_CLUSTER_DIST = 8;
+LEK_SALT_CLUSTER_RADIUS = 5;					-- members within 5 of the first tile
+LEK_SALT_MEMBER_GAP = { 2, 4 };					-- each new member 2-4 tiles from the closest Salt of its cluster (1-3 tiles in between)
+LEK_SALT_ADJACENT_PCT = 15;						-- chance that a member may touch another Salt of its cluster
+LEK_SALT_MIN_CLUSTER_DIST = 10;
 LEK_SALT_MIN_CAPITAL_DIST = 4;
 LEK_SALT_MIN_CITY_STATE_DIST = 2;
 
@@ -20651,7 +20653,7 @@ function AssignStartingPlots.LekPlaceSaltBand(self)
 		if Map.GetPlotByIndex(k):GetResourceType(-1) == res then existing = existing + 1; end
 	end
 	local target = LEK_SALT_TARGET[1] + Map.Rand(LEK_SALT_TARGET[2] - LEK_SALT_TARGET[1] + 1, "Lek salt target");
-	local need = target - existing;
+	local need = math.max(target - existing, LEK_SALT_CLUSTER_SIZE[1]);
 	local anchors, placed, parts = {}, {}, {};
 	for _, band in ipairs({ LEK_SALT_BAND, LEK_SALT_BAND_FALLBACK }) do
 		if need < LEK_SALT_CLUSTER_SIZE[1] then break; end
@@ -20679,9 +20681,25 @@ function AssignStartingPlots.LekPlaceSaltBand(self)
 					end
 				end
 				near = GetShuffledCopyOfTable(near);
-				for _, t in ipairs(near) do
-					if #members >= size then break; end
-					members[#members + 1] = t;
+				-- each new member keeps 1-3 tiles to the closest Salt of the cluster; touching only rarely
+				local function gapToMembers(t)
+					local best = 99;
+					for _, m in ipairs(members) do
+						local d = Map.PlotDistance(t[1], t[2], m[1], m[2]);
+						if d < best then best = d; end
+					end
+					return best;
+				end
+				while #members < size do
+					local allowAdj = Map.Rand(100, "Lek salt adjacency") < LEK_SALT_ADJACENT_PCT;
+					local pick = nil;
+					for _, t in ipairs(near) do
+						local g = gapToMembers(t);
+						if g >= LEK_SALT_MEMBER_GAP[1] and g <= LEK_SALT_MEMBER_GAP[2] then pick = t; break; end
+						if allowAdj and g == 1 and pick == nil then pick = t; end
+					end
+					if pick == nil then break; end
+					members[#members + 1] = pick;
 				end
 				if #members >= LEK_SALT_CLUSTER_SIZE[1] then
 					for _, m in ipairs(members) do
@@ -20700,7 +20718,9 @@ function AssignStartingPlots.LekPlaceSaltBand(self)
 			end
 		end
 	end
-	LekLandStatsLog("### LekSalt existing=" .. existing .. " target=" .. target .. " clusters=" .. #anchors .. " tiles=" .. #placed .. " " .. table.concat(parts, " "));
+	local saltLine = "### LekSalt existing=" .. existing .. " target=" .. target .. " clusters=" .. #anchors .. " tiles=" .. #placed .. " " .. table.concat(parts, " ");
+	LekLandStatsLog(saltLine);
+	print(saltLine);
 	return placed;
 end
 ------------------------------------------------------------------------------
