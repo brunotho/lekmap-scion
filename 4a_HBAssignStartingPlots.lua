@@ -15357,7 +15357,8 @@ end
 --   among those, the sites most equally far from their two nearest starts win (one picked at random).
 function AssignStartingPlots:LekIsSpecialCityState(city_state_ID)
 	local player = Players[city_state_ID];
-	if player == nil or not player:IsEverAlive() or player.GetMinorCivType == nil then
+	-- (nobody is alive yet during map generation: players come alive with their starting units)
+	if player == nil or player.GetMinorCivType == nil or player:GetMinorCivType() < 0 then
 		return false;
 	end
 	local info = GameInfo.MinorCivilizations[player:GetMinorCivType()];
@@ -15372,13 +15373,14 @@ function AssignStartingPlots:LekPlaceSpecialCityStates()
 			table.insert(specials, cs_number);
 		end
 	end
+	print("### LekSpecialCS: " .. #specials .. " special of " .. tostring(self.iNumCityStates) .. " City-States");
 	if #specials == 0 then
 		return;
 	end
 	local starts = {};
 	for i = 0, GameDefines.MAX_MAJOR_CIVS - 1 do
 		local player = Players[i];
-		if player ~= nil and player:IsEverAlive() then
+		if player ~= nil then
 			local sp = player:GetStartingPlot();
 			if sp ~= nil then
 				table.insert(starts, {sp:GetX(), sp:GetY()});
