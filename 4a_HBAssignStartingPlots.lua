@@ -20513,10 +20513,6 @@ function AssignStartingPlots:LekRareResourceSpots()
 			local ft = p:GetFeatureType();
 			return p:GetPlotType() == PlotTypes.PLOT_HILLS and (ft == FOREST or ft == JUNGLE);
 		end },
-		{ id = self.deer_ID, name = "deer", fits = function(p)
-			return p:GetPlotType() == PlotTypes.PLOT_LAND and p:GetTerrainType() == TerrainTypes.TERRAIN_TUNDRA
-				and p:GetFeatureType() == FeatureTypes.NO_FEATURE;
-		end },
 	};
 	local summary = {};
 	for _, rule in ipairs(rules) do
@@ -24420,7 +24416,13 @@ function AssignStartingPlots.LekFurDeerEnsureForestAdjacency(plot, x, y)
 	end
 end
 ------------------------------------------------------------------------------
+LEK_DEER_OPEN_TUNDRA_PCT = 25;			-- mainland tundra Deer without forest (user, 2026-10-27: 20-30%)
+LEK_DEER_OPEN_TUNDRA_ISLAND_PCT = 10;	-- islands: lower, they get extra forest anyway
 function AssignStartingPlots:FixResourceGraphics()
+	-- Lekmap (user, 2026-10-27): some tundra Deer stay without forest (fewer on islands, which get extra forest)
+	local lekBiggestArea = Map.FindBiggestArea(false);
+	local lekBiggestAreaID = lekBiggestArea and lekBiggestArea:GetID() or -1;
+	local lekDeerTundra, lekDeerOpen, lekDeerIslandTundra, lekDeerIslandOpen = 0, 0, 0, 0;
 
 	--[[ MOD.Barathor: 
 	
@@ -24472,6 +24474,21 @@ function AssignStartingPlots:FixResourceGraphics()
 			res_ID == self.hardwood_ID or
 			   res_ID == self.deer_ID then
 
+			local lekOpenDeer = false;
+			if res_ID == self.deer_ID and terrainType == TerrainTypes.TERRAIN_TUNDRA then
+				local onIsland = plot:GetArea() ~= lekBiggestAreaID;
+				lekOpenDeer = Map.Rand(100, "Lek open tundra deer") < (onIsland and LEK_DEER_OPEN_TUNDRA_ISLAND_PCT or LEK_DEER_OPEN_TUNDRA_PCT);
+				if onIsland then
+					lekDeerIslandTundra = lekDeerIslandTundra + 1;
+					if lekOpenDeer then lekDeerIslandOpen = lekDeerIslandOpen + 1; end
+				else
+					lekDeerTundra = lekDeerTundra + 1;
+					if lekOpenDeer then lekDeerOpen = lekDeerOpen + 1; end
+				end
+			end
+			if lekOpenDeer then
+				plot:SetFeatureType(FeatureTypes.NO_FEATURE, -1);
+			else
 			local deerForestPct = (res_ID == self.deer_ID or res_ID == self.fur_ID)
 				and ((terrainType == TerrainTypes.TERRAIN_TUNDRA) and 80 or 90)
 				or 100;
@@ -24539,6 +24556,7 @@ function AssignStartingPlots:FixResourceGraphics()
 					plot:SetFeatureType(FeatureTypes.FEATURE_FOREST, -1)
 				end		
 			end
+			end -- not an open tundra Deer
 			if res_ID == self.deer_ID or res_ID == self.fur_ID then
 				AssignStartingPlots.LekFurDeerEnsureForestAdjacency(plot, x, y);
 			end
@@ -24618,6 +24636,8 @@ function AssignStartingPlots:FixResourceGraphics()
 		end
 	end
 	--]]
+	print("### LekDeer tundra mainland=" .. lekDeerTundra .. " open=" .. lekDeerOpen
+		.. " islands=" .. lekDeerIslandTundra .. " open=" .. lekDeerIslandOpen);
 end
 ------------------------------------------------------------------------------
 function AssignStartingPlots:PrintFinalResourceTotalsToLog()

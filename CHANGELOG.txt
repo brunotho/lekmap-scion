@@ -2,7 +2,8 @@
 
 ## Resources
 - Fixed: bonus resources (Wheat, Cattle, Deer, Fish and the others) are placed again; Lekmap Scion 1.0.0 placed almost none.
-- Now and then a Sugar sits on a marsh, Spices on a forested or jungle hill, or Deer on open flat tundra (this was meant to be in 1.0.0 but never worked).
+- Now and then a Sugar sits on a marsh or Spices on a forested or jungle hill (this was meant to be in 1.0.0 but never worked).
+- About a quarter of the Deer on tundra stand in the open, without forest (fewer on islands); before, every Deer had a forest.
 - Amber under jungle always sits on plains (a jungle on grassland could appear before).
 - Salt mostly sits in small groups of 2-4, 4 to 6 tiles inland from the ocean (lakes and inland seas don't count), usually with 1-3 tiles between them. It can still appear alone as a City-State's luxury or near a capital; there are 4-6 Salt on a map (before: about 4).
 
