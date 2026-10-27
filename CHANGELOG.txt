@@ -3,9 +3,14 @@
 ## Resources
 - Fixed: bonus resources (Wheat, Cattle, Deer, Fish and the others) are placed again; Lekmap Scion 1.0.0 placed almost none.
 - Now and then a Sugar sits on a marsh or Spices on a forested or jungle hill (this was meant to be in 1.0.0 but never worked).
-- About a quarter of the Deer on tundra stand in the open, without forest (fewer on islands); before, every Deer had a forest.
+- About a quarter of the Deer and Fur on tundra stand in the open, without forest (fewer on islands); before, every one had a forest.
 - Amber under jungle always sits on plains (a jungle on grassland could appear before).
 - Salt mostly sits in small groups of 2-4, 4 to 6 tiles inland from the ocean (lakes and inland seas don't count), usually with 1-3 tiles between them. It can still appear alone as a City-State's luxury or near a capital; there are 4-6 Salt on a map (before: about 4).
+
+## Terrain
+- On about one map in five, the snow band on one side (north or south) reaches 2-5 rows further towards the middle; the other climate bands on that side get narrower in proportion. Snow can then show up on the mainland.
+- The land bridge island type has no mountains any more, only flat land and hills.
+- Fixed: Lake Victoria always has land on all six sides; it could sit next to a small inland sea.
 
 ## Graphics
 - All land on a map uses the same continent art (textures); before, islands of 10 or more tiles got a different random set than the mainland next to them.

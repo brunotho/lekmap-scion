@@ -534,12 +534,13 @@ function TryPlaceWrapSoftLandbridge(plotTypes, opts)
 	for _, t in ipairs(tiles) do
 		local idx = pidx(t[1], t[2], iW);
 		local r = Map.Rand(100, "");
+		-- flat and hills only, no mountains (user, 2026-10-27); later passes (ridges) skip these tiles too
+		_lek_no_mountain_plots = _lek_no_mountain_plots or {};
+		_lek_no_mountain_plots[idx - 1] = true;
 		if r < 60 then
 			plotTypes[idx] = PlotTypes.PLOT_HILLS;
-		elseif r < 98 then
-			plotTypes[idx] = PlotTypes.PLOT_LAND;
 		else
-			plotTypes[idx] = PlotTypes.PLOT_MOUNTAIN;
+			plotTypes[idx] = PlotTypes.PLOT_LAND;
 		end
 	end
 

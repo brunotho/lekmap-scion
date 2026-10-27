@@ -10,6 +10,8 @@
 ----------------------------------------------------------------------------------
 TerrainGenerator = {};
 ----------------------------------------------------------------------------------
+LEK_SNOW_SHIFT_CHANCE = 20;	-- % of maps whose snow band reaches further on one side (user, 2026-10-27)
+LEK_SNOW_SHIFT_ROWS = { {2, 35}, {3, 30}, {4, 20}, {5, 15} };	-- {extra rows, % of those maps}
 function TerrainGenerator.Create(args)
 	--[[ Civ4's truncated "Climate" setting has been abandoned. Civ5 has returned to 
 	Civ3-style map options for World Age, Temperature, and Rainfall. Control over the 
@@ -90,6 +92,19 @@ function TerrainGenerator.Create(args)
 	local gridWidth, gridHeight = Map.GetGridSize();
 	local world_info = GameInfo.Worlds[Map.GetWorldSize()];
 
+	-- Lekmap (user, 2026-10-27): on LEK_SNOW_SHIFT_CHANCE % of maps one hemisphere's snow band reaches a few rows
+	-- further towards the equator; the other bands of that hemisphere shrink in proportion (see GetLatitudeAtPlot).
+	local lekSnowShiftRows, lekSnowShiftNorth = 0, false;
+	if Map.Rand(100, "Lek snow band shift") < LEK_SNOW_SHIFT_CHANCE then
+		local r, acc = Map.Rand(100, "Lek snow band rows"), 0;
+		for _, opt in ipairs(LEK_SNOW_SHIFT_ROWS) do
+			acc = acc + opt[2];
+			if r < acc then lekSnowShiftRows = opt[1]; break; end
+		end
+		lekSnowShiftNorth = Map.Rand(2, "Lek snow band side") == 0;
+	end
+	print("### LekSnowBand shiftRows=" .. lekSnowShiftRows .. (lekSnowShiftRows > 0 and (lekSnowShiftNorth and " north" or " south") or ""));
+
 	local data = {
 	
 		-- member methods
@@ -114,6 +129,8 @@ function TerrainGenerator.Create(args)
 		
 		fSnowLatitude			= fSnowLatitude,
 		fTundraLatitude			= fTundraLatitude,
+		lekSnowShiftRows		= lekSnowShiftRows,
+		lekSnowShiftNorth		= lekSnowShiftNorth,
 		fGrassLatitude			= fGrassLatitude,
 		fDesertBottomLatitude	= fDesertBottomLatitude,
 		fDesertTopLatitude		= fDesertTopLatitude,
@@ -166,6 +183,20 @@ function TerrainGenerator:GetLatitudeAtPlot(iX, iY)
 		lat = math.clamp(lat, 0, 1);
 	else
 		lat = math.max(0, math.min(1, lat));
+	end
+
+	-- Lekmap snow band shift: in the chosen hemisphere, latitudes are stretched so the snow line sits
+	-- lekSnowShiftRows rows closer to the equator; every band below it gives up its share in proportion.
+	if (self.lekSnowShiftRows or 0) > 0 and ((iY >= self.iHeight / 2) == self.lekSnowShiftNorth) then
+		local s = self.fSnowLatitude;
+		local s2 = math.max(0.05, s - self.lekSnowShiftRows / (self.iHeight / 2));
+		if s2 < s and s < 1 then
+			if lat < s2 then
+				lat = lat * s / s2;
+			else
+				lat = s + (lat - s2) * (1 - s) / (1 - s2);
+			end
+		end
 	end
 	
 	return lat;

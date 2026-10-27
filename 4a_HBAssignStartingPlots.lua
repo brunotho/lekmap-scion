@@ -13373,6 +13373,16 @@ function AssignStartingPlots:CanBeThisNaturalWonderType(x, y, wn, rn)
 	-- Checks a candidate plot for eligibility to host the supplied wonder type.
 	-- "rn" = the row number for this wonder type within the xml Placement data table.
 	local plot = Map.GetPlot(x, y);
+	-- Lekmap (user, 2026-10-27): Lake Victoria always has 6 land neighbours. Its data rule only avoids fresh water
+	-- and ocean coast, which a small inland sea of Lekmap's slipped through.
+	if self.wonder_list and self.wonder_list[wn] == "FEATURE_LAKE_VICTORIA" then
+		for dir = 0, 5 do
+			local np = Map.PlotDirection(x, y, dir);
+			if np == nil or np:IsWater() then
+				return
+			end
+		end
+	end
 	-- Use Custom Eligibility method if indicated.
 	if self.EligibilityMethodNumber[wn] ~= -1 then
 		local method_number = self.EligibilityMethodNumber[wn];
@@ -24416,13 +24426,14 @@ function AssignStartingPlots.LekFurDeerEnsureForestAdjacency(plot, x, y)
 	end
 end
 ------------------------------------------------------------------------------
-LEK_DEER_OPEN_TUNDRA_PCT = 25;			-- mainland tundra Deer without forest (user, 2026-10-27: 20-30%)
+LEK_DEER_OPEN_TUNDRA_PCT = 25;			-- mainland tundra Deer and Fur without forest (user, 2026-10-27: 20-30%)
 LEK_DEER_OPEN_TUNDRA_ISLAND_PCT = 10;	-- islands: lower, they get extra forest anyway
 function AssignStartingPlots:FixResourceGraphics()
 	-- Lekmap (user, 2026-10-27): some tundra Deer stay without forest (fewer on islands, which get extra forest)
 	local lekBiggestArea = Map.FindBiggestArea(false);
 	local lekBiggestAreaID = lekBiggestArea and lekBiggestArea:GetID() or -1;
 	local lekDeerTundra, lekDeerOpen, lekDeerIslandTundra, lekDeerIslandOpen = 0, 0, 0, 0;
+	local lekFurTundra, lekFurOpen = 0, 0;
 
 	--[[ MOD.Barathor: 
 	
@@ -24475,10 +24486,13 @@ function AssignStartingPlots:FixResourceGraphics()
 			   res_ID == self.deer_ID then
 
 			local lekOpenDeer = false;
-			if res_ID == self.deer_ID and terrainType == TerrainTypes.TERRAIN_TUNDRA then
+			if (res_ID == self.deer_ID or res_ID == self.fur_ID) and terrainType == TerrainTypes.TERRAIN_TUNDRA then
 				local onIsland = plot:GetArea() ~= lekBiggestAreaID;
 				lekOpenDeer = Map.Rand(100, "Lek open tundra deer") < (onIsland and LEK_DEER_OPEN_TUNDRA_ISLAND_PCT or LEK_DEER_OPEN_TUNDRA_PCT);
-				if onIsland then
+				if res_ID == self.fur_ID then
+					lekFurTundra = lekFurTundra + 1;
+					if lekOpenDeer then lekFurOpen = lekFurOpen + 1; end
+				elseif onIsland then
 					lekDeerIslandTundra = lekDeerIslandTundra + 1;
 					if lekOpenDeer then lekDeerIslandOpen = lekDeerIslandOpen + 1; end
 				else
@@ -24637,7 +24651,8 @@ function AssignStartingPlots:FixResourceGraphics()
 	end
 	--]]
 	print("### LekDeer tundra mainland=" .. lekDeerTundra .. " open=" .. lekDeerOpen
-		.. " islands=" .. lekDeerIslandTundra .. " open=" .. lekDeerIslandOpen);
+		.. " islands=" .. lekDeerIslandTundra .. " open=" .. lekDeerIslandOpen
+		.. " | Fur tundra=" .. lekFurTundra .. " open=" .. lekFurOpen);
 end
 ------------------------------------------------------------------------------
 function AssignStartingPlots:PrintFinalResourceTotalsToLog()

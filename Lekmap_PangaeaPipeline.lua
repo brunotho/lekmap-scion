@@ -2067,6 +2067,7 @@ function LekAddMediumMountainRidges(plotTypes, iW, iH, wrapX)
 	-- and every mountain neighbour belongs to `own` (so ridges never merge into bigger groups).
 	local function canJoin(k, own)
 		if isOceanK(k) or isMtnK(k) then return false; end
+		if _lek_no_mountain_plots and _lek_no_mountain_plots[k] then return false; end	-- e.g. the soft land bridge
 		local _, y = xyK(k);
 		if y < yMin or y > yMax then return false; end
 		for _, nk in ipairs(nbrs(k)) do
@@ -4100,6 +4101,7 @@ end
 
 function GeneratePlotTypes()
 	if LekPipelineFlow then LekPipelineFlow("GeneratePlotTypes_entry"); end
+	_lek_no_mountain_plots = {};	-- tiles that must never become mountains (filled by island types, read by the ridges pass)
 	if not _lek_mapgen_world_is_small then
 		dbg("### STAGE: GeneratePlotTypes ENTRY ###");
 		dbg("### STAGE: GeneratePlotTypes start ###");
@@ -5782,8 +5784,15 @@ function LekRepairDeadEndRivers()
 				local made = false;
 				for i = 1, 3 do
 					local p = d.c.plots[i];
+					local nextToWonder = false;
+					if p ~= nil then
+						for dir = 0, 5 do
+							local np = nb(p, dir);
+							if np ~= nil and LekPlotIsNaturalWonder(np) then nextToWonder = true; end
+						end
+					end
 					if p ~= nil and not made and not startPlots[idx(p)] and p:GetResourceType(-1) == -1
-						and not LekPlotIsNaturalWonder(p) and not p:IsMountain() then
+						and not LekPlotIsNaturalWonder(p) and not p:IsMountain() and not nextToWonder then
 						-- the plot opposite the incoming edge: not one of the two plots the edge separates
 						local ee = edgeBetween(d.c.plots[(i % 3) + 1], d.c.plots[((i + 1) % 3) + 1]);
 						if ee ~= nil and sameEdge(ee, d.e) then
