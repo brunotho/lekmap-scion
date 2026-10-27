@@ -1577,7 +1577,9 @@ function AssignStartingPlots.Create()
 		ObtainNextSectionInRegion = AssignStartingPlots.ObtainNextSectionInRegion,
 		PlaceCityState = AssignStartingPlots.PlaceCityState,
 		PlaceCityStateInRegion = AssignStartingPlots.PlaceCityStateInRegion,
-		PlaceCityStates = AssignStartingPlots.PlaceCityStates,	-- Dependent on AssignLuxuryRoles being executed first, so beware.
+		PlaceCityStates = AssignStartingPlots.PlaceCityStates,
+		LekIsSpecialCityState = AssignStartingPlots.LekIsSpecialCityState,
+		LekPlaceSpecialCityStates = AssignStartingPlots.LekPlaceSpecialCityStates,	-- Dependent on AssignLuxuryRoles being executed first, so beware.
 		NormalizeCityState = AssignStartingPlots.NormalizeCityState,
 		NormalizeCityStateLocations = AssignStartingPlots.NormalizeCityStateLocations, -- Dependent on PlaceLuxuries being executed first.
 
@@ -15347,6 +15349,126 @@ function AssignStartingPlots:PlaceCityStateInRegion(city_state_number, region_nu
 	end
 end
 ------------------------------------------------------------------------------
+------------------------------------------------------------------------------
+-- Lekmod Scion: special City-States (MinorCivilizations.LekmodSpecial; the mod draws 0-2 per game).
+-- They go between two neighbouring players or into the middle, never outside the circle the players' starts form:
+--   centre = the land plot whose farthest start is nearest, radius = that distance;
+--   a site must lie within 80% of the radius from the centre and at least 5 tiles from every start;
+--   among those, the sites most equally far from their two nearest starts win (one picked at random).
+function AssignStartingPlots:LekIsSpecialCityState(city_state_ID)
+	local player = Players[city_state_ID];
+	if player == nil or not player:IsEverAlive() or player.GetMinorCivType == nil then
+		return false;
+	end
+	local info = GameInfo.MinorCivilizations[player:GetMinorCivType()];
+	return info ~= nil and (info.LekmodSpecial == true or info.LekmodSpecial == 1);
+end
+------------------------------------------------------------------------------
+function AssignStartingPlots:LekPlaceSpecialCityStates()
+	local iW, iH = Map.GetGridSize();
+	local specials = {};
+	for cs_number = 1, self.iNumCityStates do
+		if self:LekIsSpecialCityState(cs_number + GameDefines.MAX_MAJOR_CIVS - 1) then
+			table.insert(specials, cs_number);
+		end
+	end
+	if #specials == 0 then
+		return;
+	end
+	local starts = {};
+	for i = 0, GameDefines.MAX_MAJOR_CIVS - 1 do
+		local player = Players[i];
+		if player ~= nil and player:IsEverAlive() then
+			local sp = player:GetStartingPlot();
+			if sp ~= nil then
+				table.insert(starts, {sp:GetX(), sp:GetY()});
+			end
+		end
+	end
+	if #starts < 2 then
+		print("### LekSpecialCS: fewer than 2 starts, specials placed like regular City-States");
+		return;
+	end
+	local function Dist(x1, y1, x2, y2)
+		return self:LekGlobalSix_PlotDistance(x1, y1, x2, y2) or 999;
+	end
+	-- centre and radius of the players' circle
+	local cX, cY, radius = -1, -1, 9999;
+	for y = 0, iH - 1 do
+		for x = 0, iW - 1 do
+			local plot = Map.GetPlot(x, y);
+			if plot ~= nil and plot:GetPlotType() ~= PlotTypes.PLOT_OCEAN then
+				local far = 0;
+				for _, st in ipairs(starts) do
+					far = math.max(far, Dist(x, y, st[1], st[2]));
+					if far >= radius then
+						break;
+					end
+				end
+				if far < radius then
+					cX, cY, radius = x, y, far;
+				end
+			end
+		end
+	end
+	if cX < 0 then
+		return;
+	end
+	local placedSpecials = {};
+	for _, cs_number in ipairs(specials) do
+		local best, bestScore = {}, 9999;
+		for y = 0, iH - 1 do
+			for x = 0, iW - 1 do
+				if Dist(x, y, cX, cY) * 10 <= radius * 8 and self:CanPlaceCityStateAt(x, y, -1, false, false) then
+					local d1, d2 = 9999, 9999;
+					for _, st in ipairs(starts) do
+						local d = Dist(x, y, st[1], st[2]);
+						if d < d1 then
+							d2 = d1; d1 = d;
+						elseif d < d2 then
+							d2 = d;
+						end
+					end
+					local ok = d1 >= 5;
+					for _, other in ipairs(placedSpecials) do
+						if Dist(x, y, other[1], other[2]) < 8 then
+							ok = false;
+						end
+					end
+					if ok then
+						local score = d2 - d1;
+						if score < bestScore then
+							best, bestScore = {{x, y}}, score;
+						elseif score == bestScore then
+							table.insert(best, {x, y});
+						end
+					end
+				end
+			end
+		end
+		if #best > 0 then
+			local pick = best[1 + Map.Rand(#best, "Lekmod special City-State site - LUA")];
+			local cs_x, cs_y = pick[1], pick[2];
+			local city_state_ID = cs_number + GameDefines.MAX_MAJOR_CIVS - 1;
+			self.cityStatePlots[cs_number] = {cs_x, cs_y, -1};
+			self.city_state_validity_table[cs_number] = true;
+			Players[city_state_ID]:SetStartingPlot(Map.GetPlot(cs_x, cs_y));
+			self:GenerateLuxuryPlotListsAtCitySite(cs_x, cs_y, 1, true)
+			self:PlaceResourceImpact(cs_x, cs_y, 5, 3) -- City State layer
+			self:PlaceResourceImpact(cs_x, cs_y, 2, 3) -- Luxury layer
+			self:PlaceResourceImpact(cs_x, cs_y, 1, 0) -- Strategic layer, at start point only.
+			self:PlaceResourceImpact(cs_x, cs_y, 3, 3) -- Bonus layer
+			self:PlaceResourceImpact(cs_x, cs_y, 4, 3) -- Fish layer
+			self:PlaceResourceImpact(cs_x, cs_y, 7, 3) -- Marble layer
+			self.playerCollisionData[cs_y * iW + cs_x + 1] = true;
+			table.insert(placedSpecials, {cs_x, cs_y});
+			print("### LekSpecialCS: " .. tostring(GameInfo.MinorCivilizations[Players[city_state_ID]:GetMinorCivType()].Type) ..
+				" at " .. cs_x .. "," .. cs_y .. " (centre " .. cX .. "," .. cY .. ", radius " .. radius .. ", unevenness " .. bestScore .. ", " .. #best .. " equal sites)");
+		else
+			print("### LekSpecialCS: no site inside the players' circle for City-State #" .. cs_number .. ", placed like a regular one");
+		end
+	end
+end
 function AssignStartingPlots:PlaceCityStates()
 	if not LekMapgenTupleBenchmarkMode() then
 		print("Map Generation - Choosing sites for City States");
@@ -15365,6 +15487,7 @@ function AssignStartingPlots:PlaceCityStates()
 	self._lek_cs_selected_nil = 0;
 
 	self:AssignCityStatesToRegionsOrToUninhabited()
+	self:LekPlaceSpecialCityStates() -- Lekmod Scion: special City-States among the players first
 	
 	--print("-"); print("--- City State Placement Results ---");
 
@@ -15373,7 +15496,7 @@ function AssignStartingPlots:PlaceCityStates()
 	local iUninhabitedCandidatePlots = table.maxn(self.uninhabited_areas_coastal_plots);
 	--print("-"); print("."); print(". NUMBER OF UNINHABITED CS CANDIDATE PLOTS: ", iUninhabitedCandidatePlots); print(".");
 	for cs_number, region_number in ipairs(self.city_state_region_assignments) do
-		if cs_number <= self.iNumCityStates then -- Make sure it's an active city state before processing.
+		if cs_number <= self.iNumCityStates and self.city_state_validity_table[cs_number] ~= true then -- Make sure it's an active city state before processing (special ones are already placed).
 			if region_number == -1 and iUninhabitedCandidatePlots > 0 then -- Assigned to areas outside of Regions.
 				--print("Place City States, place in uninhabited called for City State", cs_number);
 				iUninhabitedCandidatePlots = iUninhabitedCandidatePlots - 1;
