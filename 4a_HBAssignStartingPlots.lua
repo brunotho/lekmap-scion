@@ -20654,6 +20654,10 @@ function AssignStartingPlots.LekPlaceAmberClusters(self)
 			end
 		end
 		if nearJungle and (tt == TerrainTypes.TERRAIN_GRASS or tt == TerrainTypes.TERRAIN_PLAINS) then
+			-- jungle always sits on plains (user, 2026-10-27: an Amber jungle on grassland was seen)
+			if tt == TerrainTypes.TERRAIN_GRASS then
+				p:SetTerrainType(TerrainTypes.TERRAIN_PLAINS, false, true);
+			end
 			p:SetFeatureType(FeatureTypes.FEATURE_JUNGLE, -1);
 		else
 			p:SetFeatureType(FeatureTypes.FEATURE_FOREST, -1);
