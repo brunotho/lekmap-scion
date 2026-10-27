@@ -21505,7 +21505,8 @@ function AssignStartingPlots:PlaceLuxuries()
 		-- Salt is no random filler; the band pass places it in clusters (not added to luxPos: the diversity check ignores it)
 		if self.salt_ID then
 			if want[self.salt_ID] then want[self.salt_ID] = 0; end
-			AssignStartingPlots.LekPlaceSaltBand(self);
+			local okSalt, errSalt = pcall(AssignStartingPlots.LekPlaceSaltBand, self);
+			if not okSalt then print("### PlaceResources_err stage=LekPlaceSaltBand err=" .. tostring(errSalt)); end
 		end
 		for loop, res_ID in ipairs(self.resourceIDs_assigned_to_random) do
 			local primary, secondary, tertiary, quaternary, quinary, senary, luxury_plot_lists, current_list, iNumLeftToPlace;	-- MOD.Barathor: New -- added a quinary and senary list
