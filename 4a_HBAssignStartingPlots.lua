@@ -15456,7 +15456,7 @@ function AssignStartingPlots:LekPlaceSpecialCityStates()
 			self.city_state_validity_table[cs_number] = true;
 			Players[city_state_ID]:SetStartingPlot(Map.GetPlot(cs_x, cs_y));
 			self:GenerateLuxuryPlotListsAtCitySite(cs_x, cs_y, 1, true)
-			self:PlaceResourceImpact(cs_x, cs_y, 5, 3) -- City State layer
+			self:PlaceResourceImpact(cs_x, cs_y, 5, 4) -- City State layer (radius 4 like City-States placed in regions: 4 tiles between City-States)
 			self:PlaceResourceImpact(cs_x, cs_y, 2, 3) -- Luxury layer
 			self:PlaceResourceImpact(cs_x, cs_y, 1, 0) -- Strategic layer, at start point only.
 			self:PlaceResourceImpact(cs_x, cs_y, 3, 3) -- Bonus layer
