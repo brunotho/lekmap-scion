@@ -25622,11 +25622,37 @@ function AssignStartingPlots:PlaceResourcesAndCityStates()
 		end
 	end
 	-- Lekmod Scion: tell the mod which luxuries belong to the players' regions (Lübeck's cartel acts on them)
+	-- (each with the player whose start region got it: Lubeck's holder's own regional luxuries give +1, all others -1)
 	if Game ~= nil and Game.LekmodSetRegionalLuxury ~= nil then
 		local names = {};
+		local reported = {};
+		for region_number, res_ID in pairs(self.region_luxury_assignment or {}) do
+			local start = self.startingPlots and self.startingPlots[region_number];
+			local owner = -1;
+			if start ~= nil then
+				-- the player whose start is nearest the region's start (starts can move a little after the regions are made)
+				local best = 9999;
+				for i = 0, GameDefines.MAX_MAJOR_CIVS - 1 do
+					local player = Players[i];
+					local sp = player and player:GetStartingPlot();
+					if sp ~= nil then
+						local d = Map.PlotDistance(sp:GetX(), sp:GetY(), start[1], start[2]);
+						if d < best then
+							best, owner = d, i;
+						end
+					end
+				end
+			end
+			Game.LekmodSetRegionalLuxury(res_ID, owner);
+			reported[res_ID] = true;
+			table.insert(names, tostring(GameInfo.Resources[res_ID] and GameInfo.Resources[res_ID].Type or res_ID) .. "=" .. owner);
+		end
+		-- regional luxuries without a region entry (should not happen): reported without a player
 		for _, res_ID in ipairs(self.resourceIDs_assigned_to_regions or {}) do
-			Game.LekmodSetRegionalLuxury(res_ID);
-			table.insert(names, tostring(GameInfo.Resources[res_ID] and GameInfo.Resources[res_ID].Type or res_ID));
+			if not reported[res_ID] then
+				Game.LekmodSetRegionalLuxury(res_ID, -1);
+				table.insert(names, tostring(GameInfo.Resources[res_ID] and GameInfo.Resources[res_ID].Type or res_ID) .. "=?");
+			end
 		end
 		print("### LekRegionalLux: " .. table.concat(names, " "));
 	end
