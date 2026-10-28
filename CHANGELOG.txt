@@ -1,4 +1,4 @@
-# Lekmap Scion 0.1.0 (compared with Lekmap 5.2)
+# Lekmap Scion 0.1.1 (compared with Lekmap 5.2)
 
 Test builds are numbered 0.1.x; this list always shows everything that differs from Lekmap 5.2.
 
@@ -12,6 +12,7 @@ Test builds are numbered 0.1.x; this list always shows everything that differs f
 - No mountain next to a capital touches salt water (such mountains become hills).
 - At least 1 city-state is close-ish to each player.
 - City-state spots are better: no tiny land protrusions when coastal, fresh water where possible, extra strategic resources for city-states in the center of the map.
+- Special City-States (Lekmod Scion) are placed first, among the players: inside the circle of the starting locations, at least 5 tiles from every capital, as equally far from their two nearest capitals as possible, and 4+ tiles from other City-States.
 
 ## Map shape and islands
 - The map uses a taller aspect ratio, so the pangaea is less elongated.
