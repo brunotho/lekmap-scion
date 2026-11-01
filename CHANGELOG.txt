@@ -31,6 +31,7 @@ Test builds are numbered 0.1.x; this list always shows everything that differs f
 - Luxuries no longer spawn on flat desert. Flat desert also counts as junk for desert regions, so capitals have less extreme amounts of it.
 - Luxury variety: a city-state shares its luxury with at most 1 of its 5 nearest city-states, and random luxuries avoid spots where 2+ of the 6 nearest luxuries are the same type.
 - Salt mostly sits in small groups of 2-4, 4 to 6 tiles inland from the ocean (lakes and inland seas don't count), usually with 1-3 tiles between them. It can still appear alone as a City-State's luxury or near a capital; there are 4-6 Salt on a map.
+- Salt is never placed next to another luxury resource.
 - Now and then a Sugar sits on a marsh or Spices on a forested or jungle hill.
 - About a quarter of the Deer and Fur on tundra stand in the open, without forest (fewer on islands). Open Deer don't need a forest next to them, so wide open tundra with Deer can appear.
 - Amber under jungle always sits on plains.

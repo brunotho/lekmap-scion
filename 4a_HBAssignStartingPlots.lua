@@ -20766,6 +20766,14 @@ function AssignStartingPlots.LekPlaceSaltBand(self)
 		end
 		return true;
 	end
+	-- no other luxury on the 6 tiles around (Salt may touch Salt; luxuries placed later keep off through PlaceResourceImpact)
+	local function clearOfOtherLuxuries(x, y)
+		for _, t in ipairs(GetHexRingAtRadius(x, y, 1, iW, iH, wrapX, false)) do
+			local r = Map.GetPlot(t[1], t[2]):GetResourceType(-1);
+			if r ~= -1 and r ~= res and Game.GetResourceUsageType(r) == ResourceUsageTypes.RESOURCEUSAGE_LUXURY then return false; end
+		end
+		return true;
+	end
 	local function okTile(x, y, band, needFreeLayer)
 		local k = y * iW + x;
 		local d = dist[k];
@@ -20776,6 +20784,7 @@ function AssignStartingPlots.LekPlaceSaltBand(self)
 		if tt ~= TerrainTypes.TERRAIN_PLAINS and tt ~= TerrainTypes.TERRAIN_TUNDRA then return false; end	-- no luxuries on flat desert
 		if p:GetResourceType(-1) ~= -1 or p:IsCity() or LekPlotIsNaturalWonder(p) or not p:CanHaveResource(res, false) then return false; end
 		if needFreeLayer and self.luxuryData[k + 1] ~= 0 then return false; end
+		if not clearOfOtherLuxuries(x, y) then return false; end
 		if self:LekStratMinDistanceToAnyMajorStart(x, y) < LEK_SALT_MIN_CAPITAL_DIST then return false; end
 		return farFromCityStates(x, y);
 	end
