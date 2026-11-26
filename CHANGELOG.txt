@@ -44,6 +44,9 @@ Test builds are numbered 0.1.x; this list always shows everything that differs f
   - Oil: 18 within 3 tiles, plus one deposit at 4-5 and one at 6-7 tiles, each 18 or 8 (even chance)
   - Uranium: 6 or 2 (even chance) at 3-5 tiles, plus 1 at 6-8 tiles
 
+## Fixes
+- When a map had to be generated again during start placement (e.g. for the capital distance rules), the rivers and features of the discarded map stayed on the new one: rivers running along the coast with broken river graphics, Oases on hills or plains. Every new attempt now starts from a clean map.
+
 ## Notes
 - The design and all testing were done on Small maps with 6 players; on other sizes odd things may happen.
 - Various other terrain and resource adjustments.

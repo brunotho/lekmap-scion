@@ -844,6 +844,33 @@ function StartPlotSystem()
 	start_plot_database:PlaceResourcesAndCityStates()
 end
 
+------------------------------------------------------------------------------
+-- Lekmap (user, 2026-11-26): a layout retry starts from a clean map.
+-- When start placement rejects a layout, LekHB_GenerateMap_Core runs again in the same map. SetPlotTypes and
+-- GenerateTerrain overwrite plot and terrain types, but rivers, features and resources of the rejected layout
+-- stayed: DoRiver stops at an existing river and AddFeatures only fills plots without a feature. The old rivers
+-- then ran along the new coasts (river edges next to water) and old Oases sat on hills or plains.
+------------------------------------------------------------------------------
+function LekClearMapForLayoutRetry()
+	local F = FlowDirectionTypes;
+	local nRivers, nFeatures, nResources = 0, 0, 0;
+	for k = 0, Map.GetNumPlots() - 1 do
+		local p = Map.GetPlotByIndex(k);
+		if p:IsWOfRiver() then p:SetWOfRiver(false, F.NO_FLOWDIRECTION); nRivers = nRivers + 1; end
+		if p:IsNWOfRiver() then p:SetNWOfRiver(false, F.NO_FLOWDIRECTION); nRivers = nRivers + 1; end
+		if p:IsNEOfRiver() then p:SetNEOfRiver(false, F.NO_FLOWDIRECTION); nRivers = nRivers + 1; end
+		if p:GetFeatureType() ~= FeatureTypes.NO_FEATURE then
+			p:SetFeatureType(FeatureTypes.NO_FEATURE, -1);
+			nFeatures = nFeatures + 1;
+		end
+		if p:GetResourceType(-1) ~= -1 then
+			p:SetResourceType(-1, 0);
+			nResources = nResources + 1;
+		end
+	end
+	print("### LekMapGen layout_retry_reset rivers=" .. nRivers .. " features=" .. nFeatures .. " resources=" .. nResources);
+end
+
 function LekHB_GenerateMap_Core()
 	local tCore0 = (os and os.clock) and os.clock() or 0;
 	do
@@ -1090,6 +1117,9 @@ function GenerateMap()
 		layoutAttempt = layoutAttempt + 1;
 		_lek_map_layout_attempt = layoutAttempt;
 		_lek_global_six_request_map_regen = false;
+		if layoutAttempt > 1 then
+			LekClearMapForLayoutRetry();
+		end
 		local maxL = _lek_global_six_regen_max_layouts;
 		if type(maxL) ~= "number" or maxL < 1 then
 			maxL = 4;
