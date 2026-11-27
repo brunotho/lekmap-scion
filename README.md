@@ -1,17 +1,10 @@
-# Lekmap Scion 1.0.1
+# Lekmap Scion (archived)
 
-Civ5 map script for Lekmod Scion: Fractal Pangaea, listed as `Lekmap Scion 1.0.1`.
-Equator Ring is parked in `unused/` (`.lua.off`, so the game doesn't list it); rename it back to `.lua` in the map folder to use it.
-Lekmap Scion continues Lekmap 6.0.6 under its own name and numbering (1.0.0 = 6.0.6 + the changes since).
+**This repository is archived.** Since November 2026 Lekmap Scion ships inside the mod: there is no separate map download any more.
 
-## Install
+- Mod and map: https://github.com/brunotho/Lekmod-Scion (map scripts in `LEKMOD/Maps/`, map changelog and notes in `map/`)
+- Installation: https://brunotho.github.io/Lekmod-Scion/install.html
 
-1. Copy this repo folder into:
-   `…/Civilization V/…/Assets/Maps/`
-2. Any folder name works. Lekmod Scion's Multiplayer > New Game finds the map by its file name
-   (`LekmapScion_FractalPangaea.lua`), so keep the file names.
-3. In Advanced Setup, pick `Lekmap Scion 1.0.1`.
+If you installed the map from here before (a folder like `Assets/Maps/Lekmap Scion 0.1.8`), delete that folder: the mod puts its own copy into `Assets/Maps/Lekmap Scion` and asks you to restart the game once.
 
-Changelog: `CHANGELOG.txt` (compared with Lekmap 5.2; shown on the Lekmod Scion website). Older notes: `Changelog_v6.0.*`.
-
-https://app.notion.com/p/Map-Changelog-public-3a5a5c16314480528ea6d9ce17f14f44
+The history up to 0.1.8 (plus one later fix) stays here for reference. Lekmap Scion continued Lekmap 6.0.6 under its own name and numbering.
